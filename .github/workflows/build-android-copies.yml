@@ -2,11 +2,10 @@ name: Build Android Copies
 
 # Builds release APKs that install side by side with the stock app:
 # app.alextran.immich2 ("Immich 2") and app.alextran.immich3 ("Immich 3").
+# Runs on the PR that carries this workflow, so rebasing the branch onto main and pushing rebuilds.
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/build-android-copies.yml'
+  pull_request:
 
 permissions: {}
 
