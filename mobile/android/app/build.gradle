@@ -36,13 +36,17 @@ android {
     compose true
   }
 
+  // APP_COPY builds a side-by-side copy, e.g. APP_COPY=2 -> app.alextran.immich2 named "Immich 2".
+  // Android package segments must start with a letter, so the number is appended to the last segment.
+  def appCopy = System.getenv("APP_COPY")
+
   defaultConfig {
-    applicationId "app.alextran.immich"
+    applicationId "app.alextran.immich${appCopy ?: ''}"
     minSdk = 26
     targetSdk = flutter.targetSdkVersion
     versionCode flutter.versionCode
     versionName flutter.versionName
-    resValue "string", "app_name", "Immich"
+    resValue "string", "app_name", appCopy ? "Immich ${appCopy}" : "Immich"
   }
 
   signingConfigs {
