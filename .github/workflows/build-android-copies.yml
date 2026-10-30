@@ -1,0 +1,71 @@
+name: Build Android Copies
+
+# Builds release APKs that install side by side with the stock app:
+# app.alextran.immich2 ("Immich 2") and app.alextran.immich3 ("Immich 3").
+# Runs on the PR that carries this workflow, so rebasing the branch onto main and pushing rebuilds.
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build Immich ${{ matrix.copy }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        copy: ['2', '3']
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Mise
+        uses: immich-app/devtools/actions/use-mise@caac7f7e4298458a14238959504f411fc6cc7f06 # use-mise-action-v3.2.3
+        with:
+          github_token: ${{ github.token }}
+          working_directory: ./mobile
+
+      # Without a KEY_JKS secret the APK is signed with the runner's throwaway debug key,
+      # so later builds will not install as updates over earlier ones.
+      - name: Create the Keystore
+        env:
+          KEY_JKS: ${{ secrets.KEY_JKS }}
+        working-directory: ./mobile
+        run: |
+          if [[ -n "$KEY_JKS" ]]; then
+            printf "%s" "$KEY_JKS" | base64 -d > android/key.jks
+          fi
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: ''
+
+      - name: Install dependencies
+        run: mise //mobile:install:ci
+
+      - name: Perform codegen
+        run: mise //mobile:codegen
+
+      - name: Build APK
+        working-directory: ./mobile
+        env:
+          APP_COPY: ${{ matrix.copy }}
+          ALIAS: ${{ secrets.ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          flutter build apk --release
+          mv build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/immich-${APP_COPY}.apk"
+
+      - name: Publish APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: immich-${{ matrix.copy }}-apk
+          path: mobile/build/app/outputs/flutter-apk/immich-${{ matrix.copy }}.apk
